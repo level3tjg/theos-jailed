@@ -16,6 +16,15 @@ function change_bundle_id {
 	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID${bundle_id#$app_bundle_id}" "$1"
 }
 
+/usr/libexec/PlistBuddy -c "Add :ALTBundleIdentifier string" "$info_plist"
+/usr/libexec/PlistBuddy -c "Set :ALTBundleIdentifier $app_bundle_id" "$info_plist"
+
+rm -rf $appdir/_CodeSignature/CodeResources
+
+if [[ $_REMOVE_EXTENSIONS = 1 ]]; then
+	rm -rf $appdir/PlugIns
+fi
+
 if [[ -n $BUNDLE_ID ]]; then
 	log 2 "Setting bundle ID"
 	export -f change_bundle_id
@@ -50,6 +59,24 @@ mkdir -p "$full_copy_path"
 for file in "${inject_files[@]}" "${copy_files[@]}"; do
 	copy "$file" "$full_copy_path"
 done
+
+bundle_files=($EMBED_BUNDLES)
+
+for file in "${bundle_files[@]}"; do
+	copy -L "$file" "$appdir"
+done
+
+appex_files=($EMBED_EXTENSIONS)
+
+full_appex_path="$appdir/$APPEX_PATH"
+if [[ ! -z appex_files ]]; then
+	if [[ ! -f $full_appex_path ]]; then
+		mkdir $full_appex_path
+	fi
+	for file in "${appex_files[@]}"; do
+		copy "$file" "$full_appex_path"
+	done
+fi
 
 log 3 "Injecting dependencies"
 app_binary="$appdir/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$info_plist")"

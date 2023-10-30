@@ -11,13 +11,15 @@ if [[ -d $RESOURCES_DIR ]]; then
 	copy "$RESOURCES_DIR"/ "$appdir" --exclude "/Info.plist"
 fi
 
+bundle_id_xpath="/plist/dict/key[text()=\"CFBundleIdentifier\"]/following-sibling::*[1]/text()"
+
 function change_bundle_id {
-	bundle_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$1")
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID${bundle_id#$app_bundle_id}" "$1"
+	bundle_id=$(xmlstarlet sel -t -c "$bundle_id_xpath" "$1")
+	xmlstarlet ed -L -u "$bundle_id_xpath" -v "$BUNDLE_ID${bundle_id#$app_bundle_id}" "$1"
 }
 
-/usr/libexec/PlistBuddy -c "Add :ALTBundleIdentifier string" "$info_plist"
-/usr/libexec/PlistBuddy -c "Set :ALTBundleIdentifier $app_bundle_id" "$info_plist"
+xmlstarlet ed -L -s "/plist/dict" -t elem -n key -v "ALTBundleIdentifier" "$info_plist"
+xmlstarlet ed -L -s "/plist/dict" -t elem -n string -v "$app_bundle_id" "$info_plist"
 
 rm -rf $appdir/_CodeSignature/CodeResources
 
@@ -30,15 +32,15 @@ if [[ -n $BUNDLE_ID ]]; then
 	export -f change_bundle_id
 	export app_bundle_id
 	find "$appdir" -name "*.appex" -print0 | xargs -I {} -0 bash -c "change_bundle_id '{}/Info.plist'"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$info_plist"
+	xmlstarlet ed -L -u "$bundle_id_xpath" -v "$BUNDLE_ID" "$info_plist"
 fi
 
 if [[ -n $DISPLAY_NAME ]]; then
 	log 2 "Setting display name"
-	/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string" "$info_plist" 
-	/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $DISPLAY_NAME" "$info_plist" 
+	xmlstarlet ed -L -u "/plist/dict/key[text()=\"CFBundleDisplayName\"]/following-sibling::*[1]/text()" -v "$DISPLAY_NAME" "$info_plist"
 fi
 
+# TODO: merge plist files with xmlstarlet
 if [[ -f $RESOURCES_DIR/Info.plist ]]; then
 	log 2 "Merging Info.plist"
 	copy "$RESOURCES_DIR/Info.plist" "$STAGING_DIR"
@@ -79,11 +81,11 @@ if [[ ! -z appex_files ]]; then
 fi
 
 log 3 "Injecting dependencies"
-app_binary="$appdir/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$info_plist")"
-install_name_tool -add_rpath "@executable_path/$COPY_PATH" "$app_binary"
+app_binary="$appdir/$(xmlstarlet sel -t -c "/plist/dict/key[text()=\"CFBundleExecutable\"]/following-sibling::*[1]/text()" "$info_plist")"
+"$INSTALL_NAME_TOOL" -add_rpath "@executable_path/$COPY_PATH" "$app_binary"
 for file in "${inject_files[@]}"; do
 	filename=$(basename "$file")
-	install_name_tool -change "$STUB_SUBSTRATE_INSTALL_PATH" "$SUBSTRATE_INSTALL_PATH" "$full_copy_path/$filename"
+	"$INSTALL_NAME_TOOL" -change "$STUB_SUBSTRATE_INSTALL_PATH" "$SUBSTRATE_INSTALL_PATH" "$full_copy_path/$filename"
 	"$INSERT_DYLIB" --inplace --weak --no-strip-codesig "@rpath/$(basename "$file")" "$app_binary"
 	if [[ $? != 0 ]]; then
 		error "Failed to inject $filename into $app"
@@ -116,13 +118,13 @@ if [[ $_CODESIGN_IPA = 1 ]]; then
 		codesign_name=$(security find-certificate -c "$DEV_CERT_NAME" login.keychain | grep alis | cut -f4 -d\" | cut -f1 -d\")
 	else
 		# http://maniak-dobrii.com/extracting-stuff-from-provisioning-profile/
-		codesign_name=$(/usr/libexec/PlistBuddy -c "Print :DeveloperCertificates:0" "$PROFILE_FILE" | openssl x509 -noout -inform DER -subject | sed -E 's/.*CN[[:space:]]*=[[:space:]]*([^,]+).*/\1/')
+		codesign_name=$(xmlstarlet sel -t -v "/plist/dict/key[text()=\"DeveloperCertificates\"]/following-sibling::*/*" "$PROFILE_FILE" | openssl x509 -noout -inform DER -subject | sed -E 's/.*CN[[:space:]]*=[[:space:]]*([^,]+).*/\1/')
 	fi
 	if [[ -z $codesign_name ]]; then
 		error "Failed to get codesign name"
 	fi
 
-	/usr/libexec/PlistBuddy -x -c "Print :Entitlements" "$PROFILE_FILE" > "$ENTITLEMENTS"
+	xmlstarlet sel -t -c "/plist/dict/key[text()=\"Entitlements\"]/following-sibling::*[1]" "$PROFILE_FILE" > "$ENTITLEMENTS"
 	if [[ $? != 0 ]]; then
 		error "Failed to generate entitlements"
 	fi

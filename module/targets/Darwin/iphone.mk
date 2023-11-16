@@ -4,5 +4,5 @@ _THEOS_TARGET_DEFAULT_PACKAGE_FORMAT := ipa-jailed
 $(TWEAK_NAME)_INSTALL := 0
 THEOS_JAILED_PATH := $(THEOS_MODULE_PATH)/jailed
 THEOS_JAILED_BIN := $(THEOS_JAILED_PATH)/bin
-export INSERT_DYLIB := $(THEOS_JAILED_BIN)/insert_dylib_darwin
+export INSERT_DYLIB := $(THEOS_JAILED_BIN)/insert_dylib
 export INSTALL_NAME_TOOL := install_name_tool

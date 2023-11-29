@@ -5,4 +5,4 @@ $(TWEAK_NAME)_INSTALL := 0
 THEOS_JAILED_PATH := $(THEOS_MODULE_PATH)/jailed
 THEOS_JAILED_BIN := $(THEOS_JAILED_PATH)/bin
 export INSERT_DYLIB := $(THEOS_JAILED_BIN)/insert_dylib-$(shell arch)
-export INSTALL_NAME_TOOL := $(wildcard /usr/lib/llvm-*/bin/llvm-install-name-tool)
+export INSTALL_NAME_TOOL := $(lastword $(wildcard /usr/lib/llvm-*/bin/llvm-install-name-tool))

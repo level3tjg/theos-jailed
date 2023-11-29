@@ -86,6 +86,9 @@ app_binary="$appdir/$(xmlstarlet sel -t -c "/plist/dict/key[text()=\"CFBundleExe
 for file in "${inject_files[@]}"; do
 	filename=$(basename "$file")
 	"$INSTALL_NAME_TOOL" -change "$STUB_SUBSTRATE_INSTALL_PATH" "$SUBSTRATE_INSTALL_PATH" "$full_copy_path/$filename"
+	if [[ $? != 0 ]]; then
+		error "Failed to change substrate install path in $filename"
+	fi
 	"$INSERT_DYLIB" --inplace --weak --no-strip-codesig "@rpath/$(basename "$file")" "$app_binary"
 	if [[ $? != 0 ]]; then
 		error "Failed to inject $filename into $app"

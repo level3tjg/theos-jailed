@@ -152,6 +152,5 @@ else
 	if [[ $? != 0 ]]; then
 		error "Failed to repack $app"
 	fi
-	rm -rf "$PACKAGES_DIR"/*.ipa "$PACKAGES_DIR"/*.app
 	mv "$OUTPUT_NAME" "$PACKAGES_DIR/"
 fi
